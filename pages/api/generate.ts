@@ -83,3 +83,11 @@ export default async function handler(
     res.status(500).json({ text: `Failed to process image: ${errorMessage}`, image: null });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
