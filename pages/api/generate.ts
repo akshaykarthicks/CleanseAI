@@ -24,55 +24,24 @@ You are an expert image processing specialist focused on inpainting and object r
 **Critical Warning:** The final image must look natural and un-edited. The reconstruction of the background must be flawless.
 `;
 
-const generateContentWithRetry = async (
-  payload: any,
-  retries = 4,
-  delay = 1000
-): Promise<any> => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await ai.models.generateContent(payload);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('429') && i < retries - 1) {
-        console.log(
-          `Attempt ${
-            i + 1
-          } failed with 429 error. Retrying in ${delay}ms...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2;
-      } else {
-        console.error('Final attempt failed or a non-retryable error occurred.');
-        throw error;
-      }
-    }
-  }
-  throw new Error('Exhausted all retries');
-};
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<RemovalResult>
 ) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
-    return res
-      .status(405)
-      .json({ text: `Method ${req.method} Not Allowed`, image: null });
+    return res.status(405).json({ text: `Method ${req.method} Not Allowed`, image: null });
   }
 
   const { base64ImageData, mimeType, userPrompt } = req.body;
 
   if (!base64ImageData || !mimeType || !userPrompt) {
-    return res
-      .status(400)
-      .json({ text: 'Missing required parameters', image: null });
+    return res.status(400).json({ text: 'Missing required parameters', image: null });
   }
 
   try {
-    const payload = {
-      model: 'gemini-1.5-flash',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
       contents: {
         parts: [
           {
@@ -89,9 +58,7 @@ export default async function handler(
       config: {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
       },
-    };
-
-    const response = await generateContentWithRetry(payload);
+    });
 
     const result: RemovalResult = { image: null, text: null };
 
@@ -106,26 +73,13 @@ export default async function handler(
     }
 
     if (!result.image && !result.text) {
-      return res
-        .status(500)
-        .json({ text: 'The API returned an empty response.', image: null });
+      return res.status(500).json({ text: 'The API returned an empty response.', image: null });
     }
 
     res.status(200).json(result);
   } catch (error) {
     console.error('Error calling Gemini API:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unknown error occurred.';
-    res
-      .status(500)
-      .json({ text: `Failed to process image: ${errorMessage}`, image: null });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+    res.status(500).json({ text: `Failed to process image: ${errorMessage}`, image: null });
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
