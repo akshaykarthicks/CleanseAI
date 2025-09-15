@@ -72,7 +72,7 @@ export default async function handler(
 
   try {
     const payload = {
-      model: 'gemini-1.5-flash-preview-0514',
+      model: 'gemini-1.5-flash',
       contents: {
         parts: [
           {
